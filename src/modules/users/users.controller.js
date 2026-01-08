@@ -1,6 +1,7 @@
 import { users } from "../../mock-db/users.js";
-import { embedText, generateText} from "../../services/gemini.client.js"
+import { embedText, generateText } from "../../services/gemini.client.js";
 import { User } from "./users.model.js";
+import { queueEmbedUserById } from "./users.embedding.js";
 
 // 🟡 API v1
 // ❌ route handler: get all users (mock)
@@ -114,6 +115,8 @@ export const createUser2 = async (req, res, next) => {
     const safe = doc.toObject();
     delete safe.password;
 
+    queueEmbedUserById(doc._id);
+
     return res.status(201).json({
       success: true,
       data: safe,
@@ -163,9 +166,9 @@ export const updateUser2 = async (req, res, next) => {
 
 // ✅ route handler: ask about users in the database (vector/semantic search -> Gemini generate response)
 export const askUsers2 = async (req, res, next) => {
-  const { question, topK } = req.body;
+  const { question, topK } = req.body || {};
 
-  const trimmed = String(question).trim();
+  const trimmed = String(question || "").trim();
 
   if (!trimmed) {
     const error = new Error("question is required");
@@ -175,7 +178,7 @@ export const askUsers2 = async (req, res, next) => {
   }
 
   const parsedTopK = Number.isFinite(topK) ? Math.floor(topK) : 5;
-  const limit = Math.min(Math.max.parsedTopK, 1, 20);
+  const limit = Math.min(Math.max(parsedTopK, 1), 20);
 
   try {
     // we will create embedText() later -> created
@@ -184,12 +187,12 @@ export const askUsers2 = async (req, res, next) => {
     const indexName = "users_embedding_vector_index";
 
     const numCandidates = Math.max(50, limit * 10);
-
+    console.log(queryVector);
     const sources = await User.aggregate([
       {
         $vectorSearch: {
           index: indexName,
-          path: "embedding.vector",
+          path: "embedding.vectors",
           queryVector,
           numCandidates,
           limit,
@@ -206,7 +209,7 @@ export const askUsers2 = async (req, res, next) => {
         },
       },
     ]);
-
+    console.log(sources);
     const contextLines = sources.map((s, idx) => {
       const id = s?._id ? String(s._id) : "";
       const username = s?.username ? String(s.username) : "";
@@ -242,7 +245,7 @@ export const askUsers2 = async (req, res, next) => {
 
     try {
       // we will create generateText() later -> created
-         answer = await generateText({ prompt });
+      answer = await generateText({ prompt });
     } catch (genError) {
       console.error("Gemini generation failed", {
         message: genError?.message,

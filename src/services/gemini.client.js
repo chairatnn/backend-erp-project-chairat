@@ -10,8 +10,8 @@ export const embedText = async ({
   text,
   baseUrl = process.env.GEMINI_API_BASE_URL || DEFAULT_BASE_URL,
   model = process.env.GEMINI_EMBEDDING_MODEL || EMBEDDING_MODEL,
-  timeoutMs = Number(process.env.GEMINI_HTTP_TIMEOUT_MS || 15000), // 15 seconds
-}) => {
+  timeoutMs = Number(process.env.GEMINI_HTTP_TIMEOUT_MS || 50000), // 50 seconds
+} = {}) => {
   const trimmed = String(text || "").trim();
 
   if (!trimmed) {
@@ -22,7 +22,7 @@ export const embedText = async ({
   }
 
   if (!apiKey) {
-    const error = new Error("GEMINI_API_KEY must be set to compute embedding");
+    const error = new Error("GEMINI_API_KEY must be set to compute embeddings");
     error.name = "ConfigurationError";
     error.status = 500;
     throw error;
@@ -50,11 +50,11 @@ export const embedText = async ({
   const vector =
     data?.embedding?.values ||
     data?.embedding?.value ||
-    data?.embeddings?.(0)?.values ||
-    data?.embedding?.(0)?.value;
+    data?.embeddings?.[0]?.values ||
+    data?.embeddings?.[0]?.value;
 
   if (!Array.isArray(vector)) {
-    new Error("Unexpected Gemini embeddings response shape");
+    const error = new Error("Unexpected Gemini embeddings response shape");
     error.name = "UpstreamError";
     error.status = 502;
     error.details = { receivedKeys: data ? Object.keys(data) : null };
@@ -62,7 +62,7 @@ export const embedText = async ({
   }
 
   if (vector.length !== EXPECTED_EMBEDDING_DIMS) {
-    new Error(
+    const error = new Error(
       `Embedding dimension mismatch: expected ${EXPECTED_EMBEDDING_DIMS}, got ${vector.length}`
     );
     error.name = "UpstreamError";
@@ -79,14 +79,14 @@ export const generateText = async ({
   apiKey = process.env.GEMINI_API_KEY,
   prompt,
   baseUrl = process.env.GEMINI_API_BASE_URL || DEFAULT_BASE_URL,
-  model = process.env.GEMINI_GENERATION_MODEL || EMBEDDING_MODEL,
-  timeoutMs = Number(process.env.GEMINI_HTTP_TIMEOUT_MS || 20000), // 15 seconds
+  model = process.env.GEMINI_GENERATION_MODEL || GENERATION_MODEL,
+  timeoutMs = Number(process.env.GEMINI_HTTP_TIMEOUT_MS || 20000), // 20 seconds
   temperature = Number(process.env.GEMINI_TEMPERATURE || 0.2),
-}) => {
-  const trimmed = String(text || "").trim();
+} = {}) => {
+  const trimmed = String(prompt || "").trim();
 
   if (!trimmed) {
-    const error = new Error("generateText requires non-empty text");
+    const error = new Error("generateText requires non-empty prompt");
     error.name = "ValidationError";
     error.status = 400;
     throw error;
@@ -101,7 +101,7 @@ export const generateText = async ({
 
   const url = `${baseUrl}/v1beta/models/${encodeURIComponent(
     model
-  )}:embedContent?key=${encodeURIComponent(apiKey)}`;
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const { data } = await axios.post(
     url,
@@ -124,10 +124,10 @@ export const generateText = async ({
     }
   );
 
-  const parts = data?.candidates?.(0)?.content?.parts;
+  const parts = data?.candidates?.[0]?.content?.parts;
   const text = Array.isArray(parts)
     ? parts
-        .map((e) => p?.text)
+        .map((p) => p?.text)
         .filter(Boolean)
         .join("")
     : null;
