@@ -20,7 +20,7 @@ POST  http://localhost:3000/api/v2/users/auth/cookie/login
 Content-Type: application/json
 
 {
-    "email": "happynewyear@example.com", 
+    "email": "ai14@example.com", 
     "password": "12345678"
 }
 
