@@ -7,9 +7,13 @@ Content-Type: application/json
 
 {
     "username": "ai15",
-    "email": "ai14@example.com",
+    "email": "ai15@example.com",
     "password": "12345678",
-    "role": "admin"
+    "role": "admin",
+    "order": "2601001",
+    "customer": "ABC",
+    "product": "product-1",
+    "amount": "20000"
 }
 
 ### DELETE request to delete a user

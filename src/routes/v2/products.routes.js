@@ -1,20 +1,14 @@
 import { Router } from "express";
-import {
-  askUsers2,
-  createUser2,
-  deleteUser2,
-  getUser2,
-  getUsers2,
-  updateUser2,
-} from "../../modules/users/users.controller.js";
 import { User } from "../../modules/users/users.model.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authUser } from "../../middlewares/auth.js";
+import { askProduct2, createProduct2, deleteProduct2, getProduct2, getProducts2, updateProduct2 } from "../../modules/products/products.controller.js";
+import { Product } from "../../modules/products/products.model.js";
 
 export const router = Router();
 
-router.get("/", getUsers2);
+router.get("/", getProducts2);
 
 // Check user authentication (check if user has valid token)
 router.get("/auth/cookie/me", authUser, async (req, res, next) => {
@@ -44,15 +38,15 @@ router.get("/auth/cookie/me", authUser, async (req, res, next) => {
   }
 });
 
-router.post("/auth/ai/ask", authUser, askUsers2);
+router.post("/auth/ai/ask", authUser, askProduct2);
 
-router.get("/:id", getUser2);
+router.get("/:id", getProduct2);
 
-router.post("/", createUser2);
+router.post("/", createProduct2);
 
-router.delete("/:id", authUser, deleteUser2);
+router.delete("/:id", authUser, deleteProduct2);
 
-router.patch("/:id", authUser, updateUser2);
+router.patch("/:id", authUser, updateProduct2);
 
 // Login a user - jwt signed token (token in cookies)
 router.post("/auth/cookie/login", async (req, res, next) => {
@@ -68,18 +62,18 @@ router.post("/auth/cookie/login", async (req, res, next) => {
   try {
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    const user = await User.findOne({ email: normalizedEmail }).select(
+    const product = await Product.findOne({ email: normalizedEmail }).select(
       "+password"
     );
 
-    if (!user) {
+    if (!product) {
       return res.status(401).json({
         error: true,
         message: "User not found...",
       });
     }
 
-    const isMatched = await bcrypt.compare(password, user.password);
+    const isMatched = await bcrypt.compare(password, product.password);
 
     if (!isMatched) {
       return res.status(401).json({
@@ -88,7 +82,7 @@ router.post("/auth/cookie/login", async (req, res, next) => {
       });
     }
     // Generate JSON Web Token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ productId: product._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
 
@@ -107,10 +101,11 @@ router.post("/auth/cookie/login", async (req, res, next) => {
       message: "Login successful",
       token: token,
       user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
+        _id: product._id,
+        order: product.order,
+        customer: product.customer,
+        product: product.product,
+        amount: product.amount,
       },
     });
   } catch (error) {

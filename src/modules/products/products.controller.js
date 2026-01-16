@@ -1,52 +1,15 @@
-import { users } from "../../mock-db/users.js";
 import { embedText, generateText } from "../../services/gemini.client.js";
-import { User } from "./users.model.js";
-import { queueEmbedUserById } from "./users.embedding.js";
+import { Product } from "./products.model.js";
+import { queueEmbedProductById } from "./products.embedding.js";
 
-// 🟡 API v1
-// ❌ route handler: get all users (mock)
-export const getUsers1 = (req, res) => {
-  res.status(200).json(users);
-  //   console.log(res);
-};
-
-// ❌ route handler: delete a user (mock)
-export const deleteUser1 = (req, res) => {
-  const userId = req.params.id;
-
-  const userIndex = users.findIndex((user) => user.id === userId);
-
-  if (userIndex !== -1) {
-    users.splice(userIndex, 1);
-
-    res.status(200).send(`User with ID ${userId} deleted ✅`);
-  } else {
-    res.status(404).send("User not found.");
-  }
-};
-
-// ❌ route handler: create a new user (mock)
-export const createUser1 = (req, res) => {
-  const { name, email } = req.body;
-
-  const newUser = {
-    id: String(users.length + 1),
-    name: name,
-    email: email,
-  };
-
-  users.push(newUser);
-
-  res.status(201).json(newUser);
-};
 
 // 🟢 API v2
 // ✅ route handler: GET a single user by id from the database
-export const getUser2 = async (req, res, next) => {
+export const getProduct2 = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const doc = await User.findById(id).select("-password");
+    const doc = await Product.findById(id).select("-password");
     if (!doc) {
       const error = new Error("User not found");
       return next(error);
@@ -64,12 +27,12 @@ export const getUser2 = async (req, res, next) => {
 };
 
 // ✅ route handler: get all users from the database
-export const getUsers2 = async (req, res, next) => {
+export const getProducts2 = async (req, res, next) => {
   try {
-    const users = await User.find().select("-password");
+    const products = await Product.find();
     return res.status(200).json({
       success: true,
-      data: users,
+      data: products,
     });
   } catch (error) {
     // error.name = error.name || "DatabaseError";
@@ -79,13 +42,13 @@ export const getUsers2 = async (req, res, next) => {
 };
 
 // ✅ route handler: delete a user in the database
-export const deleteUser2 = async (req, res, next) => {
+export const deleteProduct2 = async (req, res, next) => {
   const { id } = req.params;
   try {
-    const deleted = await User.findByIdAndDelete(id);
+    const deleted = await Product.findByIdAndDelete(id);
 
     if (!deleted) {
-      const error = new Error("User not found");
+      const error = new Error("Product not found");
       return next(error);
     }
 
@@ -99,23 +62,23 @@ export const deleteUser2 = async (req, res, next) => {
 };
 
 // ✅ route handler: create a new user in the database
-export const createUser2 = async (req, res, next) => {
-  const { username, email, password } = req.body;
+export const createProduct2 = async (req, res, next) => {
+  const { order, customer, product, amount } = req.body;
 
-  if (!username || !email || !password) {
-    const error = new Error("username, email, and password are required");
+  if (!order || !customer || !product || !amount) {
+    const error = new Error("order, customer, product, and amount are required");
     error.name = "ValidationError";
     error.status = 400;
     return next(error);
   }
 
   try {
-    const doc = await User.create({ username, email, password, role });
+    const doc = await Product.create({ order, customer, product, amount });
 
     const safe = doc.toObject();
-    delete safe.password;
+    // delete safe.password;
 
-    queueEmbedUserById(doc._id);
+    queueEmbedProductById(doc._id);
 
     return res.status(201).json({
       success: true,
@@ -125,23 +88,23 @@ export const createUser2 = async (req, res, next) => {
     if (error.code === 11000) {
       error.status = 409;
       error.name = "DuplicateKeyError";
-      error.message = "Email already in use";
+      error.message = "Order already in use";
     }
     error.status = 500;
     error.name = error.name || "DatabaseError";
-    error.message = error.message || "Failed to create a user";
+    error.message = error.message || "Failed to create a order";
     return next(error);
   }
 };
 
 // ✅ route handler: update a user in the database
-export const updateUser2 = async (req, res, next) => {
+export const updateProduct2 = async (req, res, next) => {
   const { id } = req.params;
 
   const body = req.body;
 
   try {
-    const updated = await User.findByIdAndUpdate(id, body);
+    const updated = await Product.findByIdAndUpdate(id, body);
 
     if (!updated) {
       const error = new Error("User not found...");
@@ -164,8 +127,8 @@ export const updateUser2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: ask about users in the database (vector/semantic search -> Gemini generate response)
-export const askUsers2 = async (req, res, next) => {
+// ✅ route handler: ask about products in the database (vector/semantic search -> Gemini generate response)
+export const askProduct2 = async (req, res, next) => {
   const { question, topK } = req.body || {};
 
   const trimmed = String(question || "").trim();
@@ -184,11 +147,11 @@ export const askUsers2 = async (req, res, next) => {
     // we will create embedText() later -> created
     const queryVector = await embedText({ text: trimmed });
 
-    const indexName = "users_embedding_vector_index";
+    const indexName = "products_embedding_vector_index";
 
     const numCandidates = Math.max(50, limit * 10);
     console.log(queryVector);
-    const sources = await User.aggregate([
+    const sources = await Product.aggregate([
       {
         $vectorSearch: {
           index: indexName,
@@ -202,9 +165,10 @@ export const askUsers2 = async (req, res, next) => {
       {
         $project: {
           _id: 1,
-          username: 1,
-          email: 1,
-          role: 1,
+          order: 1,
+          customer: 1,
+          product: 1,
+          amount: 1,
           score: { $meta: "vectorSearchScore" },
         },
       },
@@ -212,19 +176,20 @@ export const askUsers2 = async (req, res, next) => {
     console.log(sources);
     const contextLines = sources.map((s, idx) => {
       const id = s?._id ? String(s._id) : "";
-      const username = s?.username ? String(s.username) : "";
-      const email = s?.email ? String(s.email) : "";
-      const role = s?.role ? String(s.role) : "";
+      const order = s?.order ? String(s.order) : "";
+      const customer = s?.customer ? String(s.customer) : "";
+      const product = s?.product ? String(s.product) : "";
+       const amount = s?.amount ? String(s.amount) : "";
       const score = typeof s?.score === "number" ? s.score.toFixed(4) : "";
 
       return `Source ${
         idx + 1
-      }: {id: ${id}, username: ${username}, email: ${email}, role: ${role}, score: ${score}}`;
+      }: {id: ${id}, order: ${order}, customer: ${customer}, product: ${product}, amount: ${amount}, score: ${score}}`;
     });
 
-    // Source 1 {id: 123, username: chairat, email: chairat@example.com}
-    // Source 2 {id: 124, username: chairat2, email: chairat2@example.com}
-    // Source 3 {id: 125, username: chairat3, email: chairat3@example.com}
+    // Source 1 {id: 123, order: 2601001, customer: ABC, product: product-1, amount: 10000}
+    // Source 2 {id: 124, order: 2601002, customer: DEF, product: product-2, amount: 20000}
+    // Source 3 {id: 125, order: 2601003, customer: GHI, product: product-3, amount: 30000}
 
     const prompt = [
       "SYSTEM RULES:",

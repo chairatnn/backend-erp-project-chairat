@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 
-// a data model is created from a data schema
+// a data model is created from a data user schema
 
 const userSchema = new mongoose.Schema(
   {

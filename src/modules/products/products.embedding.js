@@ -1,32 +1,34 @@
-import { User } from "./users.model.js";
 import {
   embedText,
   GEMINI_EMBEDDING_DIMS,
 } from "../../services/gemini.client.js";
+import { Product } from "./products.model.js";
 
-const buildUserEmbeddingText = (userDoc) => {
-  const username = userDoc?.username ? String(userDoc.username).trim() : "";
-  const email = userDoc?.email ? String(userDoc.email).trim() : "";
-  const role = userDoc?.role ? String(userDoc.role).trim() : "user";
+const buildProductEmbeddingText = (productDoc) => {
+  const order = productDoc?.order ? String(productDoc.order).trim() : "";
+  const customer = productDoc?.customer ? String(productDoc.customer).trim() : "";
+  const product = productDoc?.product ? String(productDoc.product).trim() : "";
+  const amount = productDoc?.amount ? Number(productDoc.amount).trim() : "";
 
   return [
-    "User profile:",
-    `Username: ${username}`,
-    `Email: ${email}`,
-    `Role: ${role}`
+    "Product profile:",
+    `Order: ${order}`,
+    `Customer: ${customer}`,
+    `Product: ${product}`,
+    `Amount: ${amount}`,
   ].join("\n");
 };
 
-export const embedUserById = async (userId) => {
-  if (!userId) {
+export const embedProductById = async (productId) => {
+  if (!productId) {
     const error = new Error("userId is required");
     error.name = "ValidationError";
     error.status = 400;
     throw error;
   }
 
-  await User.findByIdAndUpdate(
-    userId,
+  await Product.findByIdAndUpdate(
+    productId,
     {
       $set: {
         "embedding.status": "PROCESSING",
@@ -38,23 +40,23 @@ export const embedUserById = async (userId) => {
   );
 
   try {
-    const user = await User.findById(userId).select(
-      "username email role embedding.status"
+    const product = await Product.findById(productId).select(
+      "order customer product amount embedding.status"
     );
 
-    if (!user) {
-      const error = new Error("User not found");
+    if (!product) {
+      const error = new Error("Product not found");
       error.name = "NotFoundError";
       error.status = 404;
       throw error;
     }
-    console.log(user);
-    const text = buildUserEmbeddingText(user);
+    console.log(product);
+    const text = buildProductEmbeddingText(product);
     console.log(text);
     const vector = await embedText({ text });
     console.log(vector);
-    await User.findByIdAndUpdate(
-      userId,
+    await Product.findByIdAndUpdate(
+      productId,
       {
         $set: {
           "embedding.status": "READY",
@@ -71,8 +73,8 @@ export const embedUserById = async (userId) => {
   } catch (error) {
     const message = String(error?.message || "Embedding failed");
 
-    await User.findByIdAndUpdate(
-      userId,
+    await Product.findByIdAndUpdate(
+      productId,
       {
         $set: {
           "embedding.status": "FAILED",
@@ -85,11 +87,11 @@ export const embedUserById = async (userId) => {
   }
 };
 
-export const queueEmbedUserById = (userId) => {
+export const queueEmbedProductById = (productId) => {
   setImmediate(() => {
-    embedUserById(userId).catch((error) => {
-      console.error("Async user embedding failed", {
-        userId,
+    embedUserById(productId).catch((error) => {
+      console.error("Async product embedding failed", {
+        productId,
         message: error?.message,
       });
     });
