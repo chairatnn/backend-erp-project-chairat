@@ -89,7 +89,7 @@ export const embedProductById = async (productId) => {
 
 export const queueEmbedProductById = (productId) => {
   setImmediate(() => {
-    embedUserById(productId).catch((error) => {
+    embedProductById(productId).catch((error) => {
       console.error("Async product embedding failed", {
         productId,
         message: error?.message,

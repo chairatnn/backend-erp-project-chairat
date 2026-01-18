@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
-    order: { type: String, required: true, minlength: 7, minlength: 7, trim: true },
+    order: { type: String, required: true, unique: true, minlength: 7, minlength: 7, trim: true },
     customer: { type: String, required: true, trim: true },
     product: { type: String, enum: ["product-1", "product-2", "product-3", "product-4", "product-5" ] },
     amount: { type: Number, required: true, trim: true, set: v => Math.round(v * 100) / 100  },

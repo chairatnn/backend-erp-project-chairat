@@ -100,7 +100,7 @@ export const deleteUser2 = async (req, res, next) => {
 
 // ✅ route handler: create a new user in the database
 export const createUser2 = async (req, res, next) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, role } = req.body;
 
   if (!username || !email || !password) {
     const error = new Error("username, email, and password are required");
