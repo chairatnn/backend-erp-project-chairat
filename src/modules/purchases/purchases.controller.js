@@ -1,15 +1,15 @@
 import { embedText, generateText } from "../../services/gemini.client.js";
-import { Product } from "./products.model.js";
-import { queueEmbedProductById } from "./products.embedding.js";
+import { Purchase } from "./purchases.model.js";
+import { queueEmbedPurchaseById } from "./purchases.embedding.js";
 
 
 // 🟢 API v2
-// ✅ route handler: GET a single product by id from the database
-export const getProduct2 = async (req, res, next) => {
+// ✅ route handler: GET a single user by PO from the database
+export const getPurchase2 = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const doc = await Product.findById(id).select("-password");
+    const doc = await Purchase.findById(id).select("-password");
     if (!doc) {
       const error = new Error("User not found");
       return next(error);
@@ -26,13 +26,13 @@ export const getProduct2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: get all products from the database
-export const getProducts2 = async (req, res, next) => {
+// ✅ route handler: get all POs from the database
+export const getPurchases2 = async (req, res, next) => {
   try {
-    const products = await Product.find();
+    const purchases = await Purchase.find();
     return res.status(200).json({
       success: true,
-      data: products,
+      data: purchases,
     });
   } catch (error) {
     // error.name = error.name || "DatabaseError";
@@ -41,14 +41,14 @@ export const getProducts2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: delete a product in the database
-export const deleteProduct2 = async (req, res, next) => {
+// ✅ route handler: delete a PO in the database
+export const deletePurchase2 = async (req, res, next) => {
   const { id } = req.params;
   try {
-    const deleted = await Product.findByIdAndDelete(id);
+    const deleted = await Purchase.findByIdAndDelete(id);
 
     if (!deleted) {
-      const error = new Error("Product not found");
+      const error = new Error("Po not found");
       return next(error);
     }
 
@@ -61,24 +61,24 @@ export const deleteProduct2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: create a new product in the database
-export const createProduct2 = async (req, res, next) => {
-  const { order, customer, product, amount } = req.body;
+// ✅ route handler: create a new PO in the database
+export const createPurchase2 = async (req, res, next) => {
+  const { po, material, supplier, cost } = req.body;
 
-  if (!order || !customer || !product || !amount) {
-    const error = new Error("order, customer, product, and amount are required");
+  if (!po || !material || !supplier || !cost) {
+    const error = new Error("po, material, supplier, and cost are required");
     error.name = "ValidationError";
     error.status = 400;
     return next(error);
   }
 
   try {
-    const doc = await Product.create({ order, customer, product, amount });
+    const doc = await Purchase.create({ po, material, supplier, cost });
 
     const safe = doc.toObject();
     // delete safe.password;
 
-    queueEmbedProductById(doc._id);
+    queueEmbedPurchaseById(doc._id);
 
     return res.status(201).json({
       success: true,
@@ -88,7 +88,7 @@ export const createProduct2 = async (req, res, next) => {
     if (error.code === 11000) {
       error.status = 409;
       error.name = "DuplicateKeyError";
-      error.message = "Order already in use";
+      error.message = "Po already in use";
     }
     error.status = 500;
     error.name = error.name || "DatabaseError";
@@ -97,14 +97,14 @@ export const createProduct2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: update a product in the database
-export const updateProduct2 = async (req, res, next) => {
+// ✅ route handler: update a PO in the database
+export const updatePurchase2 = async (req, res, next) => {
   const { id } = req.params;
 
   const body = req.body;
 
   try {
-    const updated = await Product.findByIdAndUpdate(id, body);
+    const updated = await Purchase.findByIdAndUpdate(id, body);
 
     if (!updated) {
       const error = new Error("User not found...");
@@ -127,8 +127,8 @@ export const updateProduct2 = async (req, res, next) => {
   }
 };
 
-// ✅ route handler: ask about products in the database (vector/semantic search -> Gemini generate response)
-export const askProduct2 = async (req, res, next) => {
+// ✅ route handler: ask about POs in the database (vector/semantic search -> Gemini generate response)
+export const askPurchase2 = async (req, res, next) => {
   const { question, topK } = req.body || {};
 
   const trimmed = String(question || "").trim();
@@ -147,11 +147,11 @@ export const askProduct2 = async (req, res, next) => {
     // we will create embedText() later -> created
     const queryVector = await embedText({ text: trimmed });
 
-    const indexName = "products_embedding_vector_index";
+    const indexName = "purchases_embedding_vector_index";
 
     const numCandidates = Math.max(50, limit * 10);
     console.log(queryVector);
-    const sources = await Product.aggregate([
+    const sources = await Purchase.aggregate([
       {
         $vectorSearch: {
           index: indexName,
@@ -165,10 +165,10 @@ export const askProduct2 = async (req, res, next) => {
       {
         $project: {
           _id: 1,
-          order: 1,
-          customer: 1,
-          product: 1,
-          amount: 1,
+          po: 1,
+          material: 1,
+          supplier: 1,
+          cost: 1,
           score: { $meta: "vectorSearchScore" },
         },
       },
@@ -176,20 +176,20 @@ export const askProduct2 = async (req, res, next) => {
     console.log(sources);
     const contextLines = sources.map((s, idx) => {
       const id = s?._id ? String(s._id) : "";
-      const order = s?.order ? String(s.order) : "";
-      const customer = s?.customer ? String(s.customer) : "";
-      const product = s?.product ? String(s.product) : "";
-       const amount = s?.amount ? String(s.amount) : "";
+      const po = s?.po ? String(s.po) : "";
+      const material = s?.material ? String(s.material) : "";
+      const supplier = s?.supplier ? String(s.supplier) : "";
+       const cost = s?.cost ? String(s.cost) : "";
       const score = typeof s?.score === "number" ? s.score.toFixed(4) : "";
 
       return `Source ${
         idx + 1
-      }: {id: ${id}, order: ${order}, customer: ${customer}, product: ${product}, amount: ${amount}, score: ${score}}`;
+      }: {id: ${id}, po: ${po}, material: ${material}, supplier: ${supplier}, cost: ${cost}, score: ${score}}`;
     });
 
-    // Source 1 {id: 123, order: 2601001, customer: ABC, product: product-1, amount: 10000}
-    // Source 2 {id: 124, order: 2601002, customer: DEF, product: product-2, amount: 20000}
-    // Source 3 {id: 125, order: 2601003, customer: GHI, product: product-3, amount: 30000}
+    // Source 1 {id: 123, po: 6801001, material: rawmat-1, supplier: supA, cost: 10000}
+    // Source 2 {id: 124, po: 6801002, material: rawmat-2, supplier: supB, cost: 20000}
+    // Source 3 {id: 125, po: 6801003, material: rawmat-3, supplier: supC, cost: 30000}
 
     const prompt = [
       "SYSTEM RULES:",
